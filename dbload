@@ -1,0 +1,50 @@
+#!/usr/bin/python
+#Converts a CSV file into a database file
+
+#CSV is ordered: studentID, firstname, lastname, email, major, class--written as "subject code course#", term code, city, state, zip
+#Two tables are created: students(id text, PRIMARY KEY, lastname text, firstname text, major text, email text, city text, state text, zip text) and classes(row[0], classSplit[0], classSplit[1], row[6])
+
+import sqlite3
+import sys
+import csv
+
+if len(sys.argv) != 3:
+    print("Usage: dbload CSVFILE DATABASEFILE")
+    exit(1)
+
+myCSV = sys.argv[1]
+myDB = sys.argv[2]
+
+
+conn = sqlite3.connect(myDB)
+dbIn = conn.cursor()
+dbIn.execute('''drop table if exists classes''')
+dbIn.execute('''drop table if exists students''')
+
+dbIn.execute('''create table classes(id text, subjcode text, coursenumber text, termcode text)''')
+dbIn.execute('''create table students(id text primary key unique, lastname text, firstname text, major text,
+    email text, city text, state text, zip text)''')
+
+iStream = csv.reader(open(myCSV, 'r'), delimiter=',', quotechar='"')
+#skip csv first line (header)
+skipFirst = True
+#studentID, firstname, lastname, email, major, class(subjcode, course#) ' ' delimits, termcode, city, state, zip
+#holds previous ID
+prevID = ""
+for row in iStream:
+    if skipFirst:
+        skipFirst = False
+        continue
+    #if student isn't already inserted
+    if prevID != row[0]:
+        #students: id text, PRIMARY KEY, lastname text, firstname text, major text, email text, city text, state text, zip text
+        r = (row[0],row[2],row[1], row[4], row[3], row[7], row[8], row[9])
+        dbIn.execute('''insert into students values(?,?,?,?,?,?,?,?)''', r)
+        prevID = row[0]
+    #id text, subjcode text, coursenumber text, termcode text
+    classSplit = row[5].split(" ")
+    r = (row[0], classSplit[0], classSplit[1], row[6])
+    dbIn.execute('''insert into classes values(?,?,?,?)''', r)
+conn.commit()
+
+exit(0)
